@@ -1,26 +1,18 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Nov 20 23:21:10 2018
-
-@author: Satheesh Reddy
-"""
-
 import os
 import pandas as pd
-from sklearn import preprocessing, tree, neighbors, metrics, linear_model
+from sklearn import preprocessing, neighbors, metrics
 from sklearn_pandas import DataFrameMapper,CategoricalImputer
 import numpy as np
 from sklearn import model_selection, ensemble
 import seaborn as sns
 from sklearn import feature_selection
 import math
-from mlxtend import regressor
 
 def get_continuous_features(df):
-    return df.select_dtypes(include=['number']).columns
+    return df.select_dtypes().columns
 
 def get_categorical_features(df):
-    return df.select_dtypes(exclude=['number']).columns
+    return df.select_dtypes().columns
 
 def cast_cont_to_cat(df, features):
     for feature in features:
@@ -56,8 +48,8 @@ def select_features_from_model(selector, X_train, y_train):
     return select.transform(X_train)
 
 def plot_feature_importances(estimator, X_train, y_train):
-    indices = np.argsort(estimator.feature_importances_)[::-1][:40]
-    g = sns.barplot(y=X_train.columns[indices][:40],x = estimator.feature_importances_[indices][:40] , orient='h')
+    indices = np.argsort(estimator.feature_importances_)[::-1][:6]
+    g = sns.barplot(y=X_train.columns[indices][:6],x = estimator.feature_importances_[indices][:6] , orient='h')
     g.set_xlabel("Relative importance",fontsize=12)
     g.set_ylabel("Features",fontsize=12)
     g.tick_params(labelsize=9)
@@ -71,53 +63,52 @@ def fit_model(estimator, grid, X_train, y_train):
    grid_estimator.fit(X_train, y_train)
    print(grid_estimator.cv_results_)
    print(grid_estimator.best_params_)
-   final_model = grid_estimator.best_estimator_
-   print(final_model.coef_)
-   print(final_model.intercept_)
    print(grid_estimator.best_score_)
    print(grid_estimator.score(X_train, y_train))
-   return final_model
+   return grid_estimator.best_estimator_
 
 #changes working directory
-path = 'D:/DSSensors/'
-Sensors_train = pd.read_csv(os.path.join(path,"Train.csv"))
+path = 'D:/DSSensors/Data/'
+Sensors_train = pd.read_csv(os.path.join(path,"Train_1.csv"))
+Sensors_train.shape
+Sensors_train.info()
+Sensors_train_op = pd.read_csv(os.path.join(path,"Train_event_val_1.csv"))
+Sensors_train_op.shape
+Sensors_train_op.info()
+Sensors_train=pd.merge(Sensors_train, Sensors_train_op, on=['Time_New'])
 Sensors_train.shape
 Sensors_train.info()
 
 #type cast features
 #features_to_cast = ['MSSubClass']
-#cast_cont_to_cat(Sensors_train, features_to_cast)
+#cast_cont_to_cat(house_train, features_to_cast)
 
 #retrieve continuous & categorical features
-get_continuous_features(Sensors_train)
-get_categorical_features(Sensors_train)
+#get_continuous_features(Sensors_train)
+#get_categorical_features(house_train)
 
 #drop non-useful features
-#features_to_drop = ['Id', 'SalePrice']
-#features_to_drop.extend(get_features_to_drop_on_missingdata(Sensors_train, 0.25))
-#house_train1 = drop_features(Sensors_train, features_to_drop)
-#house_train1.info()
+features_to_drop = ['Time','Time_New','Event_val']
+#features_to_drop.extend(get_features_to_drop_on_missingdata(house_train, 0.25))
+Sensors_train1 = drop_features(Sensors_train, features_to_drop)
+Sensors_train1.info()
 
-impute_categorical_features(Sensors_train, get_categorical_features(Sensors_train))
-impute_continuous_features(Sensors_train, get_continuous_features(Sensors_train))
+#impute_categorical_features(house_train1, get_categorical_features(house_train1))
+#impute_continuous_features(Sensors_train1, get_continuous_features(Sensors_train1))
 
-Sensors_train1 = transform_cat_cont(Sensors_train, get_categorical_features(Sensors_train))
+#house_train1 = transform_cat_cont(house_train1, get_categorical_features(house_train1))
 
 X_train = Sensors_train1
-y_train = Sensors_train1['Event_val']
+y_train = Sensors_train['Event_val']
 
 selector = ensemble.RandomForestClassifier(random_state=100)
-X_train1 = select_features_from_model(selector, X_train, y_train)
+#X_train1 = select_features_from_model(selector, X_train, y_train)
+X_train.info()
+y_train.info()
+selector.fit(X_train, y_train)
+plot_feature_importances(selector, X_train, y_train)
+select = feature_selection.SelectFromModel(selector, prefit=True)
 
-knn = neighbors.KNeighborsRegressor()
-et = ensemble.ExtraTreesRegressor(random_state=100)
-ridge = linear_model.Ridge()
-lr = linear_model.LinearRegression()
-
-st_estimator = regressor.StackingRegressor(regressors=[knn, et, ridge], 
-                          meta_regressor=lr, 
-                          store_train_meta_features=True)
-st_grid = {'kneighborsregressor__n_neighbors': [3,4,5],
-          'extratreesregressor__n_estimators': [10, 50],
-          'ridge__alpha':[0.1,0.2,0.5,1.0] }
-fit_model(st_estimator, st_grid, X_train1, y_train)
+knn_estimator = neighbors.KNeighborsRegressor()
+knn_grid = {'n_neighbors':[3,5,7,9,11]}
+model = fit_model(knn_estimator, knn_grid, X_train, y_train)
